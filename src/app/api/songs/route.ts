@@ -1,40 +1,37 @@
 // src/app/api/songs/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "../../../../lib/prisma";
 
-// Typ danych przychodzących z frontu
+
 type SongInput = {
   title: string;
   artist: string;
   url: string;
 };
 
-// Typ pełnego obiektu piosenki
-type Song = SongInput & {
-  id: string;
-  createdAt: string;
-};
-
-// "Baza danych" w pamięci – znika po restarcie
-const songs: Song[] = [];
-
-/**
- * GET /api/songs
- * Zwraca listę piosenek w formacie JSON
- */
+// GET /api/songs → pobierz z bazy (Neon przez Prisma)
 export async function GET() {
-  return NextResponse.json(songs);
+  try {
+    const songs = await prisma.song.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json(songs);
+  } catch (error) {
+    console.error("API GET /api/songs error:", error);
+    return NextResponse.json(
+      { error: "Nie udało się pobrać piosenek" },
+      { status: 500 }
+    );
+  }
 }
 
-/**
- * POST /api/songs
- * Przyjmuje piosenkę, waliduje ją i dodaje do tablicy
- */
+// POST /api/songs → walidacja + zapis do bazy
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as Partial<SongInput>;
     const { title, artist, url } = body;
 
-    // Walidacja - backend zawsze sprawdza wszystko
     if (!title || !artist || !url) {
       return NextResponse.json(
         { error: "Brakuje wymaganych pól: title, artist, url" },
@@ -52,21 +49,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Tworzenie obiektu piosenki
-    const newSong: Song = {
-      title,
-      artist,
-      url,
-      id: `${Date.now()}-${Math.random()}`,
-      createdAt: new Date().toISOString(),
-    };
-
-    // Dodanie na początek listy (ostatnie dodane na górze)
-    songs.unshift(newSong);
+    const newSong = await prisma.song.create({
+      data: {
+        title,
+        artist,
+        url,
+      },
+    });
 
     return NextResponse.json(newSong, { status: 201 });
   } catch (error) {
-    console.error("API error in POST /api/songs:", error);
+    console.error("API POST /api/songs error:", error);
     return NextResponse.json(
       { error: "Wewnętrzny błąd serwera" },
       { status: 500 }
