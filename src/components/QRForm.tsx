@@ -36,7 +36,6 @@ export default function QRForm() {
       try {
         const res = await fetch("/api/songs");
         if (!res.ok) return;
-
         const data = (await res.json()) as Song[];
         setSongs(data);
       } catch (error) {
